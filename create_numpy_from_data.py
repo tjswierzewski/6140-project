@@ -52,7 +52,7 @@ def main(depth = 1, path = ".."):
         f.close()
     df = numpy.delete(df,0,0)
 
-    print(df.shape)
+    return df
 
 
 if(__name__ == "__main__"):
