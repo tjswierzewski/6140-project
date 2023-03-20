@@ -57,7 +57,7 @@ class SongList:
         return None
 
 
-def main(depth = 1, path = ".."):
+def main(depth = 5, path = ".."):
     start = 0
     stop = 999
     step = 1000
@@ -80,7 +80,7 @@ def main(depth = 1, path = ".."):
     start = 0
     stop = 999
     step = 1000
-    df = numpy.zeros((1,len(songs.list)))
+    rows = []
     for _ in range(depth):
         f = open(path + f"/spotify_million_playlist_dataset/data/mpd.slice.{start}-{stop}.json")
         data = json.load(f)
@@ -90,11 +90,11 @@ def main(depth = 1, path = ".."):
             for song in playlist["tracks"]:
                 index = songs.search(song["track_uri"])
                 row[index] = 1
-            df = numpy.vstack([df,row])
+            rows.append([row])
         start = start + step
         stop = stop + step
         f.close()
-    df = numpy.delete(df,0,0)
+    df = numpy.concatenate(rows)
 
     print(df.shape)
     return df
