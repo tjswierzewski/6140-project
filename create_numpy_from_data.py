@@ -57,7 +57,7 @@ class SongList:
         return None
 
 
-def main(depth = 5, path = ".."):
+def main(depth = 1, path = ".."):
     start = 0
     stop = 999
     step = 1000
@@ -97,7 +97,7 @@ def main(depth = 5, path = ".."):
     df = numpy.concatenate(rows)
 
     print(df.shape)
-    return df
+    numpy.save(f"UvS_matrix_D{depth}", df)
 
 
 if(__name__ == "__main__"):
