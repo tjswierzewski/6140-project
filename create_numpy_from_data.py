@@ -1,6 +1,7 @@
 import bisect
 import json
 import numpy
+import scipy.sparse as ssparse
 
 class Song:
     def __init__(self, name, track_uri) -> None:
@@ -46,7 +47,7 @@ class SongList:
         return None
         
 
-def main(depth = 5, path = ".."):
+def main(depth = 100, path = ".."):
     start = 0
     stop = 999
     step = 1000
@@ -77,16 +78,17 @@ def main(depth = 5, path = ".."):
         for playlist in data["playlists"]:
             row = numpy.zeros(len(songs.list))
             for song in playlist["tracks"]:
-                index = songs.search(song["track_uri"])
+                index = songs.search(Song.truncate_uri(song["track_uri"]))
                 row[index] = 1
-            rows.append([row])
+            new_row = ssparse.csr_array(row)
+            rows.append([new_row])
         start = start + step
         stop = stop + step
         f.close()
-    df = numpy.concatenate(rows)
+    df = ssparse.bmat(rows)
 
     print(df.shape)
-    numpy.save(f"UvS_matrix_D{depth}", df)
+    ssparse.save_npz(f"UvS_sparse_matrix_D{depth}", df)
 
 
 if(__name__ == "__main__"):

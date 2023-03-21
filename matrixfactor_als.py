@@ -61,7 +61,7 @@ def matrixfactor_als(data, count, features, lambda_r):
     return p_sparse, s_sparse
 
 def main():
-    df = np.load("UvS_matrix_D1.npy")
+    df = ssparse.load_npz("UvS_sparse_matrix_D1.npz").toarray()
     p_sparse, s_sparse = matrixfactor_als(df, 10, 10, 0.1)
 
 if (__name__ == "__main__"):
