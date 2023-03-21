@@ -6,7 +6,6 @@ class Song:
     def __init__(self, name, track_uri) -> None:
         self.name = name
         self.uri = track_uri
-        self.hash = hash(track_uri)
 
     @staticmethod
     def truncate_uri(uri):
@@ -17,19 +16,19 @@ class Song:
         return cls(song["track_name"], cls.truncate_uri(song["track_uri"]))
     
     def __eq__(self, __o: object) -> bool:
-        return self.hash == __o.hash
+        return self.uri == __o.uri
     
     def __lt__(self, __o: object) -> bool:
-        return self.hash < __o.hash
+        return self.uri < __o.uri
 
     def __le__(self, __o: object) -> bool:
-        return self.hash <= __o.hash
+        return self.uri <= __o.uri
 
     def __gt__(self, __o: object) -> bool:
-        return self.hash > __o.hash
+        return self.uri > __o.uri
 
     def __ge__(self, __o: object) -> bool:
-        return self.hash >= __o.hash
+        return self.uri >= __o.uri
 
     
     
@@ -41,7 +40,7 @@ class SongList:
         bisect.insort_left(self.list, song)
 
     def search(self, song_uri):
-        index = bisect.bisect_left(self.list, hash(song_uri), key = lambda x: x.hash)
+        index = bisect.bisect_left(self.list, song_uri, key = lambda x: x.uri)
         if len(self.list) != 0 and index != len(self.list) and self.list[index].uri == song_uri:
             return index
         return None
