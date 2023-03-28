@@ -4,10 +4,12 @@ import argparse
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import scipy.sparse as ssparse
+from scoring import full_score
 
 NEIGHBORS = 200
 TEST_LENGTH = 10
 TEST_MIN = 15
+REC_LENGTH = 500
 
 def main():
     # Script Argument Parser
@@ -34,13 +36,13 @@ def main():
     model = NearestNeighbors(n_neighbors = NEIGHBORS, metric='cosine', n_jobs=-1)
     model.fit(train.T)
 
+    scores = []
     # Iterate through test playlists
     for row in range(0, test.shape[0]):
         [_, song_index, playlist_position] = ssparse.find(test[row])
 
         # Skip playlists that are too short to test
         if len(song_index) < TEST_MIN:
-            print("Playlist too short\n")
             continue
 
         # Sort songs by playlist index and truncate to test length
@@ -68,12 +70,15 @@ def main():
         recommendation_values = np.array(recommendation_values)
         recommended_songs = np.array(list(raw_recommendations.keys()))
         song_order = recommendation_values.argsort()[::-1]
-        sorted_recommended = recommended_songs[song_order]
+        sorted_recommended = recommended_songs[song_order][:REC_LENGTH]
 
-        # Check how many recommended songs were in original playlist
-        union = np.intersect1d(sorted_recommended, song_index[TEST_LENGTH:])
-        print(f"Length of playlist: {len(song_index)}\nNumber of matches: {len(union)}\n")
-
-
+        # Scoring
+        score = full_score(song_index[order[TEST_LENGTH:]], sorted_recommended)
+        # print(f"R_Percision: {score[0]}\nNormalized Discounted Cumulative Gain: {score[1]}\nRecommended Song Clicks: {score[2]}\n")
+        scores.append(score)
+    # Average Playlist Scores    
+    npscores = np.array(scores)
+    mean = np.mean(npscores, axis=0)
+    print(f"Average:\nR_Percision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}")
 if __name__ == "__main__":
     main()
