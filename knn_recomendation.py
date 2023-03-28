@@ -5,6 +5,10 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import scipy.sparse as ssparse
 
+NEIGHBORS = 200
+TEST_LENGTH = 10
+TEST_MIN = 15
+
 def main():
     #Script Argument Parser
     parser = argparse.ArgumentParser()
@@ -27,23 +31,41 @@ def main():
     train, test = train_test_split(matrix, test_size = .1, random_state=args.seed)
 
     #Create KNN model class
-    model = NearestNeighbors(n_neighbors = 500, metric='cosine', n_jobs=-1)
+    model = NearestNeighbors(n_neighbors = NEIGHBORS, metric='cosine', n_jobs=-1)
     model.fit(train.T)
 
 
-    input = train.nonzero()[1][0]
+    for row in range(0, test.shape[0]):
 
-    # Return nearest neighbors
-    indices = model.kneighbors(train.T[input],return_distance = False)
+        [_, song_index, playlist_position] = ssparse.find(test[row])
+        if len(song_index) < TEST_MIN:
+            print("Playlist too short\n")
+            continue
+        order = playlist_position.argsort()
+        ordered_songs = song_index[order[:TEST_LENGTH]]
 
-    print(f"Input song is {songlist.list[input].name}")
+        raw_recommendations = {}
 
-    for i in indices[0][0:10]:
-        print(songlist.list[i].name)
+        for index in ordered_songs:
 
-    union = np.intersect1d(test[0].nonzero()[1], indices[0])
-    print(f"Number of common terms: {len(union)}")
-
+            # Return nearest neighbors
+            related_indices = model.kneighbors(train.T[index],return_distance = False)
+            for i, index in enumerate(related_indices[0]):
+                if not index in ordered_songs:
+                    if index in raw_recommendations.keys():
+                        raw_recommendations[index] = (raw_recommendations[index][0] + i, raw_recommendations[index][1] + 1)
+                    else:
+                        raw_recommendations[index] = (i,1)
+        
+        recommendation_values = []
+        for (position, count) in raw_recommendations.values():
+            recommendation_values.append(position / count)
+        recommendation_values = np.array(recommendation_values)
+        recommended_songs = np.array(list(raw_recommendations.keys()))
+        song_order = recommendation_values.argsort()[::-1]
+        sorted_recommended = recommended_songs[song_order]
+        union = np.intersect1d(sorted_recommended, song_index[TEST_LENGTH:])
+        print(f"Length of playlist: {len(song_index)}\nNumber of matches: {len(union)}\n")
 
 
 
