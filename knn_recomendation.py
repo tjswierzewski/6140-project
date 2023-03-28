@@ -5,8 +5,8 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import scipy.sparse as ssparse
 
-
 def main():
+    #Script Argument Parser
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-s", "--songlist", help = "Songlist Pickle", required= True)
@@ -15,19 +15,25 @@ def main():
 
     args = parser.parse_args()
 
+    #Import SongList
     songlist = SongList()
     songlist.load(args.songlist)
 
+    #Import Matrix
     matrix = ssparse.load_npz(args.matrix)
 
+
+    #Split data into test and training
     train, test = train_test_split(matrix, test_size = .1, random_state=args.seed)
 
-    model = NearestNeighbors(n_neighbors = 100, metric='cosine', n_jobs=-1)
-
+    #Create KNN model class
+    model = NearestNeighbors(n_neighbors = 500, metric='cosine', n_jobs=-1)
     model.fit(train.T)
+
 
     input = train.nonzero()[1][0]
 
+    # Return nearest neighbors
     indices = model.kneighbors(train.T[input],return_distance = False)
 
     print(f"Input song is {songlist.list[input].name}")
