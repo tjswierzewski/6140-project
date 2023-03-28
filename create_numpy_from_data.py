@@ -1,5 +1,8 @@
+import argparse
 import bisect
 import json
+import pickle
+import re
 import numpy
 import scipy.sparse as ssparse
 
@@ -46,8 +49,16 @@ class SongList:
             return index
         return None
         
+    def save(self, filename):
+        with open(filename, "wb") as file:
+            pickle.dump(self.list, file)
 
-def main(depth = 100, path = ".."):
+    def load(self, filename):
+        with open(filename, "rb") as file:
+            self.list = pickle.load(file)
+
+
+def create_song_list(depth = 1, path = ".."):
     start = 0
     stop = 999
     step = 1000
@@ -65,8 +76,10 @@ def main(depth = 100, path = ".."):
         start = start + step
         stop = stop + step
         f.close()   
+    songs.save(f"songlist_D{depth}.pickle")
+    return songs
 
-    
+def create_user_song_dataframe(songlist, depth, path):
     start = 0
     stop = 999
     step = 1000
@@ -76,10 +89,10 @@ def main(depth = 100, path = ".."):
         data = json.load(f)
     
         for playlist in data["playlists"]:
-            row = numpy.zeros(len(songs.list))
-            for song in playlist["tracks"]:
-                index = songs.search(Song.truncate_uri(song["track_uri"]))
-                row[index] = 1
+            row = numpy.zeros(len(songlist.list))
+            for i , song in enumerate(playlist["tracks"]):
+                index = songlist.search(Song.truncate_uri(song["track_uri"]))
+                row[index] = i
             new_row = ssparse.csr_array(row)
             rows.append([new_row])
         start = start + step
@@ -90,6 +103,30 @@ def main(depth = 100, path = ".."):
     print(df.shape)
     ssparse.save_npz(f"UvS_sparse_matrix_D{depth}", df)
 
+
+def main():
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-p", "--path", help = "MFD folder path", default= "..")
+    parser.add_argument("-d", "--depth", help = "Number of Slices to Use", type = int, default = 1)
+    parser.add_argument("-P", "--pickle", help = "Pickle File")
+
+    args = parser.parse_args()
+    path = args.path
+    depth = int(args.depth)
+    song_pickle = args.pickle
+
+    song_pickle
+
+    if not song_pickle:
+        songs = create_song_list(depth = depth, path = path)
+    else:
+        songs = SongList()
+        songs.load(song_pickle)
+        depth = int(re.search(r'\d+', song_pickle).group())
+
+    create_user_song_dataframe(songs, depth, path)
 
 if(__name__ == "__main__"):
     main()

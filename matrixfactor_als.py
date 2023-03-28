@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as ssparse
+from sklearn.model_selection import train_test_split
 import create_numpy_from_data as cnfd
 
 '''
@@ -12,7 +13,7 @@ s_i = ((P.T*P) + lambda*I)^-1 * (P.T * pref_i), where su is a song x feature VEC
 
 p_u : playlist x feature vector, over all u, this forms P
 s_i : song x feature vector, over all i, this forms S
-P : playlist x feature matrix, randomly intialized
+P : playlist x feature matrix, randomly initialized
 S : songs x feature matrix, randomly initialized
 lambda : Regularization term
 I : Identity matrices.
@@ -48,21 +49,22 @@ def matrixfactor_als(data, count, features, lambda_r):
         pTp = p_sparse.T.dot(p_sparse)
         sTs_lamb = sTs + lamb
         pTp_lamb = pTp + lamb
+        print("Calculating pref u")
         for u in range(0, p_size, 1):
-            print("Calculating pref u row", u)
             # Computing p_u.
-            sTpref_u = s_sparse.T.dot(data[u,:])
-            p_sparse[u] = ssparse.linalg.spsolve(sTs_lamb, sTpref_u.T)
+            sTpref_u = s_sparse.T.dot(data[u,:].T)
+            p_sparse[u] = ssparse.linalg.spsolve(sTs_lamb, sTpref_u)
+        print("Calculating pref i" )
         for i in range(0, s_size, 1):
-            print("Calculating pref i column", i)
             pTpref_i = p_sparse.T.dot(data[:,i])
             s_sparse[i] = ssparse.linalg.spsolve(pTp_lamb, pTpref_i)
     # Returning.
     return p_sparse, s_sparse
 
 def main():
-    df = ssparse.load_npz("UvS_sparse_matrix_D1.npz").toarray()
-    p_sparse, s_sparse = matrixfactor_als(df, 10, 10, 0.1)
+    df = ssparse.load_npz("UvS_sparse_matrix_D1.npz")
+    train, test = train_test_split(df, test_size = .1)
+    p_sparse, s_sparse = matrixfactor_als(train, 10, 100, 0.1)
 
 if (__name__ == "__main__"):
     main()
