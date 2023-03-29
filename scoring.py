@@ -27,9 +27,11 @@ def normalized_discounted_cumulative_gain(truncated_playlist, recommendations, i
     return dcg / idcg
 
 
-def recommended_song_clicks(truncated_playlist, recommendations):
-    song = truncated_playlist[0]
-    index = np.where(recommendations == song)
+def recommended_song_clicks(truncated_playlist, recommendations, intersect = None):
+    if type(intersect) == 'NoneType':
+        intersect = np.intersect1d(truncated_playlist, recommendations)
+    is_relevent = np.isin(recommendations, truncated_playlist).astype(int)
+    index = np.where(is_relevent == 1)
     if index[0].size == 0:
         return 51
     return int(index[0][0]) // 10
@@ -39,5 +41,5 @@ def full_score(truncated_playlist, recommendations):
     intersect = np.intersect1d(truncated_playlist, recommendations)
     r_p = r_precision(truncated_playlist, recommendations, intersect)
     ndcg = normalized_discounted_cumulative_gain(truncated_playlist, recommendations, intersect)
-    rsc = recommended_song_clicks(truncated_playlist, recommendations)
+    rsc = recommended_song_clicks(truncated_playlist, recommendations, intersect)
     return [r_p, ndcg, rsc]
