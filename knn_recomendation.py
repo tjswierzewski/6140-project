@@ -34,14 +34,14 @@ def get_playlist_recommendation(model, data, playlist):
             # Skip songs in truncated playlist
             if not index in ordered_songs:
                 if index in raw_recommendations.keys():
-                    raw_recommendations[index] = (raw_recommendations[index][0] + i, raw_recommendations[index][1] + 1)
+                    raw_recommendations[index] = raw_recommendations[index] + 500 - i
                 else:
-                    raw_recommendations[index] = (i,1)
+                    raw_recommendations[index] = 500-i
 
     # Order recommendations based on response for each song
     recommendation_values = []
-    for (position, count) in raw_recommendations.values():
-        recommendation_values.append(position / count)
+    for position in raw_recommendations.values():
+        recommendation_values.append(position / TEST_LENGTH)
     recommendation_values = np.array(recommendation_values)
     recommended_songs = np.array(list(raw_recommendations.keys()))
     song_order = recommendation_values.argsort()[::-1]
@@ -76,9 +76,11 @@ def main():
     model = NearestNeighbors(n_neighbors = NEIGHBORS, metric='cosine', n_jobs=1)
     model.fit(train.T)
 
+    # Multiprocessing for playlist analysis
     pool = Pool()
     func = partial(get_playlist_recommendation, model, train)
-    scores = pool.map(func, test.toarray(), 10)
+    test_list = [i for i in test]
+    scores = pool.map(func, test_list, 10)
     scores = [x for x in scores if x != ()]
     
 
