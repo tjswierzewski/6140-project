@@ -13,7 +13,7 @@ TEST_LENGTH = 10
 TEST_MIN = 15
 REC_LENGTH = 500
 
-def get_playlist_recommendation(model, data, playlist):
+def get_playlist_recommendation_item_based(model, data, playlist):
     [_, song_index, playlist_position] = ssparse.find(playlist)
 
     # Skip playlists that are too short to test
@@ -50,6 +50,13 @@ def get_playlist_recommendation(model, data, playlist):
     # Scoring
     return full_score(song_index[order[TEST_LENGTH:]], sorted_recommended)
         
+def get_playlist_recommendation_user_based(model, data, playlist):
+    [_, song_index, playlist_position] = ssparse.find(playlist)
+    # Skip playlists that are too short to test
+    if len(song_index) < TEST_MIN:
+        return ()
+    
+
 
 def main():
     # Script Argument Parser
@@ -72,13 +79,17 @@ def main():
     # Split data into test and training
     train, test = train_test_split(matrix, test_size = .1, random_state=args.seed)
 
-    # Create KNN model class
-    model = NearestNeighbors(n_neighbors = NEIGHBORS, metric='cosine', n_jobs=1)
-    model.fit(train.T)
+    # Create KNN item based model class
+    item_model = NearestNeighbors(n_neighbors = NEIGHBORS, metric='cosine', n_jobs=1)
+    item_model.fit(train.T)
+
+    # Create KNN user based model class
+    user_model = NearestNeighbors(n_neighbors = NEIGHBORS, metric='cosine', n_jobs=1)
+    user_model.fit(train)
 
     # Multiprocessing for playlist analysis
     pool = Pool()
-    func = partial(get_playlist_recommendation, model, train)
+    func = partial(get_playlist_recommendation_item_based, item_model, train)
     test_list = [i for i in test]
     scores = pool.map(func, test_list, 10)
     scores = [x for x in scores if x != ()]
