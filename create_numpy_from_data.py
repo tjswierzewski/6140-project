@@ -3,7 +3,7 @@ import bisect
 import json
 import pickle
 import re
-import numpy
+import numpy as np
 import scipy.sparse as ssparse
 
 class Song:
@@ -84,21 +84,24 @@ def create_user_song_dataframe(songlist, depth, path):
     stop = 999
     step = 1000
     rows = []
+    playlist_index = []
+    song_index = []
+    position_index = []
     for _ in range(depth):
         f = open(path + f"/spotify_million_playlist_dataset/data/mpd.slice.{start}-{stop}.json")
         data = json.load(f)
     
         for playlist in data["playlists"]:
-            row = numpy.zeros(len(songlist.list))
+            row = np.zeros(len(songlist.list))
             for i , song in enumerate(playlist["tracks"]):
                 index = songlist.search(Song.truncate_uri(song["track_uri"]))
-                row[index] = i
-            new_row = ssparse.csr_array(row)
-            rows.append([new_row])
+                playlist_index.append(int(playlist['pid']))
+                song_index.append(index + 1)
+                position_index.append(i)
         start = start + step
         stop = stop + step
         f.close()
-    df = ssparse.bmat(rows)
+    df = ssparse.csr_matrix((song_index, (playlist_index, position_index)))
 
     print(df.shape)
     ssparse.save_npz(f"UvS_sparse_matrix_D{depth}", df)
