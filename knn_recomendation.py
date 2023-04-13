@@ -11,8 +11,33 @@ from functools import partial
 ITEM_NEIGHBORS = 200
 USER_NEIGHBORS = 20
 TEST_LENGTH = 10
-TEST_MIN = 15
+TEST_MIN = 10
 REC_LENGTH = 500
+
+def delete_rows_csr(mat, indices):
+    """
+    Remove the rows denoted by ``indices`` form the CSR sparse matrix ``mat``.
+    """
+    if not isinstance(mat, ssparse.csr_matrix):
+        raise ValueError("works only for CSR format -- use .tocsr() first")
+    indices = list(indices)
+    mask = np.ones(mat.shape[0], dtype=bool)
+    mask[indices] = False
+    return mat[mask]
+
+def data_to_query_label(data):
+    [playlist_index, song_index, playlist_position] = ssparse.find(data)
+    index_data = ssparse.csc_matrix((song_index, (playlist_index, playlist_position.astype(int))))
+    query_playlists = index_data[:,0:11].tocsr()
+    query_answers = index_data[:,11:].tocsr()
+    rows_to_remove = np.where(np.unique(query_answers.nonzero()[0], return_counts=True)[1] < TEST_MIN)[0]
+    query_playlists = delete_rows_csr(query_playlists, rows_to_remove)
+    query_answers = delete_rows_csr(query_answers, rows_to_remove)
+    return query_playlists, query_answers
+
+
+   
+
 
 def get_playlist_recommendation_item_based(model, data, playlist):
     [_, song_index, playlist_position] = ssparse.find(playlist)
@@ -112,6 +137,7 @@ def main():
     user_model.fit(train)
 
     # Iterator for test playlists
+    out = data_to_query_label(test)
     test_list = [i for i in test]
 
     # Multiprocessing for playlist analysis
