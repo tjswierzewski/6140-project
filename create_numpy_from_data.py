@@ -3,7 +3,7 @@ import bisect
 import json
 import pickle
 import re
-import numpy
+import numpy as np
 import scipy.sparse as ssparse
 
 class Song:
@@ -84,25 +84,38 @@ def create_user_song_dataframe(songlist, depth, path):
     stop = 999
     step = 1000
     rows = []
+    playlist_index = []
+    song_index = []
+    position_index = []
     for _ in range(depth):
         f = open(path + f"/spotify_million_playlist_dataset/data/mpd.slice.{start}-{stop}.json")
         data = json.load(f)
     
         for playlist in data["playlists"]:
-            row = numpy.zeros(len(songlist.list))
+            row = np.zeros(len(songlist.list))
             for i , song in enumerate(playlist["tracks"]):
                 index = songlist.search(Song.truncate_uri(song["track_uri"]))
-                row[index] = i
-            new_row = ssparse.csr_array(row)
-            rows.append([new_row])
+                playlist_index.append(int(playlist['pid']))
+                song_index.append(index + 1)
+                position_index.append(i)
         start = start + step
         stop = stop + step
         f.close()
-    df = ssparse.bmat(rows)
+    df = ssparse.csr_matrix((song_index, (playlist_index, position_index)))
 
     print(df.shape)
     ssparse.save_npz(f"UvS_sparse_matrix_D{depth}", df)
 
+def swap_song_index_to_X(matrix, shape = None):
+    [playlist_index, X_index, value] = ssparse.find(matrix)
+    swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
+    # Normalize before summing duplicates
+    recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
+    recips = ssparse.csr_matrix(recips)
+    swapped_matrix = recips.multiply(swapped_matrix).tocsr() * -1
+    swapped_matrix[swapped_matrix != 0] += 1
+    swapped_matrix.sum_duplicates()
+    return swapped_matrix
 
 def main():
 
