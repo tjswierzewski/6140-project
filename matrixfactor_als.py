@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as ssparse
 from sklearn.model_selection import train_test_split
-import create_numpy_from_data as cnfd
+from create_numpy_from_data import swap_song_index_to_X
 
 '''
 Function: matrxifactor_als
@@ -63,6 +63,7 @@ def matrixfactor_als(data, count, features, lambda_r):
 
 def main():
     df = ssparse.load_npz("UvS_sparse_matrix_D1.npz")
+    df = swap_song_index_to_X(df)
     train, test = train_test_split(df, test_size = .1)
     p_sparse, s_sparse = matrixfactor_als(train, 10, 100, 0.1)
 

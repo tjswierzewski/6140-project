@@ -9,6 +9,7 @@ from multiprocessing import Pool
 from functools import partial
 import pandas as pd
 import scipy
+from create_numpy_from_data import swap_song_index_to_X
 
 ITEM_NEIGHBORS = 200
 USER_NEIGHBORS = 20
@@ -58,17 +59,6 @@ def remove_zeros(l):
             del l[-1]
         else:
             break
-
-def swap_song_index_to_X(matrix, shape = None):
-    [playlist_index, X_index, value] = ssparse.find(matrix)
-    swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
-    # Normalize before summing duplicates
-    recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
-    recips = ssparse.csr_matrix(recips)
-    swapped_matrix = recips.multiply(swapped_matrix).tocsr() * -1
-    swapped_matrix[swapped_matrix != 0] += 1
-    swapped_matrix.sum_duplicates()
-    return swapped_matrix
 
 def get_song_based_recommendations(data, query_playlists):
     model = NearestNeighbors(n_neighbors = ITEM_NEIGHBORS, metric='cosine', n_jobs=-1)
