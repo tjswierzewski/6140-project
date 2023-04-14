@@ -40,46 +40,6 @@ def data_to_query_label(data):
     query_playlists = [[x-1 for x in y]for y in query_playlists]
     return query_playlists, answers
 
-
-def get_song_based_recommendations(data, query_playlists):
-    model = NearestNeighbors(n_neighbors = ITEM_NEIGHBORS, metric='cosine', n_jobs=-1)
-    model.fit(data)
-    song_list = np.unique(query_playlists)
-    recommendation_by_song = model.kneighbors(data[song_list],return_distance = False)
-    query_df =  pd.DataFrame(query_playlists).applymap(lambda x: recommendation_by_song[np.where(song_list == x)[0][0]])
-    return query_df.apply(rank_merge, axis = 1).tolist()
-    
-        
-def get_playlist_recommendation_user_based(data, playlist):
-    user_model = NearestNeighbors(n_neighbors = USER_NEIGHBORS, metric='cosine', n_jobs=-1)
-    user_model.fit(data)
-    # [_, song_index, playlist_position] = ssparse.find(playlist)
-    # # Skip playlists that are too short to test
-    # if len(song_index) < TEST_MIN:
-    #     return ()
-    
-    # # Sort songs by playlist index and truncate to test length
-    # order = playlist_position.argsort()
-    # test_songs = song_index[order[TEST_LENGTH:]]
-    # given_playlist = ssparse.csr_matrix((playlist_position[order[:TEST_LENGTH]], (np.zeros(len(order[:TEST_LENGTH]), dtype=int),song_index[order[:TEST_LENGTH]])), shape = playlist.shape)
-
-    # # Calculate nearest neighbors for playlist
-    # related_indices = model.kneighbors(given_playlist ,return_distance = False)
-
-    # raw_recommendations = {}
-    # rec_playlists = data[related_indices[0]]
-    # sums = rec_playlists.sum(0)
-    # rec_song_count = rec_playlists.getnnz(0) * 500
-    # scores = (rec_song_count - sums) / USER_NEIGHBORS
-    # [_, rec_song, score] = ssparse.find(scores)
-    # rec_order = score.argsort()
-    # recommended_songs = rec_song[rec_order]
-    # recommended_songs = [x for x in recommended_songs if x not in song_index[order[:TEST_LENGTH]]]
-    
-    # Scoring
-    return full_score(test_songs, recommended_songs)
-
-
 def rank_merge(row):
     rank = {}
     def aggregate(list):
@@ -99,9 +59,9 @@ def remove_zeros(l):
         else:
             break
 
-def swap_axes(matrix):
+def swap_song_index_to_X(matrix, shape = None):
     [playlist_index, X_index, value] = ssparse.find(matrix)
-    swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)))
+    swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
     # Normalize before summing duplicates
     recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
     recips = ssparse.csr_matrix(recips)
@@ -109,6 +69,28 @@ def swap_axes(matrix):
     swapped_matrix[swapped_matrix != 0] += 1
     swapped_matrix.sum_duplicates()
     return swapped_matrix
+
+def get_song_based_recommendations(data, query_playlists):
+    model = NearestNeighbors(n_neighbors = ITEM_NEIGHBORS, metric='cosine', n_jobs=-1)
+    model.fit(data)
+    song_list = np.unique(query_playlists)
+    recommendation_by_song = model.kneighbors(data[song_list],return_distance = False)
+    query_df =  pd.DataFrame(query_playlists).applymap(lambda x: recommendation_by_song[np.where(song_list == x)[0][0]])
+    return query_df.apply(rank_merge, axis = 1).tolist()
+    
+        
+def get_playlist_recommendation_user_based(data, query_playlists):
+    Train = swap_song_index_to_X(data)
+    user_model = NearestNeighbors(n_neighbors = USER_NEIGHBORS, metric='cosine', n_jobs=-1)
+    user_model.fit(Train)
+    query_playlists = ssparse.csr_matrix(query_playlists)
+    query_playlists = swap_song_index_to_X(query_playlists, shape = (query_playlists.shape[0], Train.shape[1]))
+
+    # Calculate nearest neighbors for playlist
+    related_indices = user_model.kneighbors(query_playlists ,return_distance = False)
+    query_df = pd.DataFrame(related_indices).applymap(lambda x: np.trim_zeros(data[x].toarray()[0])-1)
+    return query_df.apply(rank_merge, axis = 1).tolist()
+
 
 def main():
     # Script Argument Parser
@@ -129,32 +111,31 @@ def main():
 
     # Split data into test and training
     train, test = train_test_split(matrix, test_size = .1, random_state=args.seed)
-
-    Train = swap_axes(train)    
+    Train = swap_song_index_to_X(train)    
+    query_playlists, query_answers = data_to_query_label(test)
 
     # Get recommendations for songs in queries
-    query_playlists, query_answers = data_to_query_label(test)
     item_recommendations = get_song_based_recommendations(Train.T, query_playlists)
     
     # Calculate item scores
     item_based_scores = list(map(lambda given, recommended: full_score(given, recommended), query_answers, item_recommendations))
     
     # Get recommendations based on users
-
-    get_playlist_recommendation_user_based(Train, query_playlists)
+    user_recommendations = get_playlist_recommendation_user_based(train, query_playlists)
     
-    # # Average Playlist Scores    
-    # np_user_based_scores = np.array(user_based_scores)
-    # mean = np.mean(np_user_based_scores, axis=0)
-    # print("")
-    # print(f"User Based Average:\nR_Percision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}")
-    # print("")
+    # Calculate item scores
+    user_based_scores = list(map(lambda given, recommended: full_score(given, recommended), query_answers, user_recommendations))
+
+    # Average Playlist Scores    
+    np_user_based_scores = np.array(user_based_scores)
 
     # Average Playlist Scores    
     np_item_based_scores = np.array(item_based_scores)
     mean = np.mean(np_item_based_scores, axis=0)
     print(f"\nItem Based Average:\nR_Percision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
 
+    mean = np.mean(np_user_based_scores, axis=0)
+    print(f"\nUser Based Average:\nR_Percision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
 
 if __name__ == "__main__":
     main()
