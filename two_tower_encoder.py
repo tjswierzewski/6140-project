@@ -1,4 +1,4 @@
-from torch import matmul, nn, functional as F
+from torch import matmul, nn, optim, functional as F
 
 class User_Item_Encoder(nn.Module):
     def __init__(self, user_features, item_features, layers, item_layers = None) -> None:
@@ -40,7 +40,11 @@ class User_Item_Encoder(nn.Module):
 
 
 def main():
+    learning_rate = 0.001
+    momentum = 0.9
     model = User_Item_Encoder(100,500, [128,64,32])
+    optimizer = optim.SGD(model.parameters, lr = 0.001, momentum= momentum)
+    loss_function = nn.BCELoss()
     
 
 if __name__ == "__main__":
