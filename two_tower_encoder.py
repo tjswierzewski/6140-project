@@ -1,11 +1,16 @@
 import argparse
+from math import floor
+import random
 from scipy import sparse
+from sklearn.model_selection import train_test_split
 import torch
 from torch import dot, float64, matmul, nn, optim, tensor, sparse_coo_tensor, sparse_csr_tensor, stack
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
 from create_numpy_from_data import SongList, Song, swap_song_index_to_X
 import numpy as np
+from time import perf_counter
+from statistics import mean
 
 class User_Item_Encoder(nn.Module):
     def __init__(self, user_features, item_features, layers, item_layers = None) -> None:
@@ -42,24 +47,25 @@ class User_Item_Encoder(nn.Module):
         return self.item_encoder_functions(items)
 
     def forward(self, users, items):
-        users = F.normalize(self.user_encoder(users))
-        items = F.normalize(self.item_encoder(items))
+        users = self.user_encoder(users)
+        items = self.item_encoder(items)
 
-        return users, items
+        return torch.matmul(users, torch.transpose(items, 0 ,1))
     
 class TrainingDataset(Dataset):
-    def __init__(self, dataset) -> None:
+    def __init__(self, dataset, available) -> None:
         super(TrainingDataset).__init__()
         self.dataset = dataset
+        self.available = available
         self.transformed_dataset = swap_song_index_to_X(self.dataset)
         [playlist, song, rank] = sparse.find(self.transformed_dataset)
-        self.song_data = sparse_coo_tensor((song, playlist), tensor(rank))
+        self.song_data = sparse_coo_tensor(np.vstack([song,playlist]), tensor(rank), size=self.transformed_dataset.shape[::-1])
 
     def __getitem__(self, index):
-        return self.song_data.select(1,index), np.trim_zeros(self.dataset[index].toarray()[0]) - 1, index
+        return self.song_data.select(1, self.available[index]), np.trim_zeros(self.dataset[self.available[index]].toarray()[0]) - 1, self.available[index]
         
     def __len__(self):
-        return self.dataset.shape[0]
+        return len(self.available)
     
     def shape(self):
         return self.song_data.shape
@@ -73,31 +79,56 @@ class DataCollator(object):
         songs = np.unique(np.concatenate(items))
         return stack(users), self.dataset.song_data.index_select(0, tensor(songs)), (key, songs)
 
+class CustomLossFunction:
+    def __init__(self) -> None:
+        self.__loss = nn.BCEWithLogitsLoss()
+    
+    def __call__(self, product, key):
+        return self.__loss(product, key)
 
-def check_model(data, data_loader, model, optimizer, loss_function, train = False):
+
+def check_model(data, data_loader, model, loss_function, optimizer = None):
+    epoch_start_time = perf_counter()
+    batch_times = []
     epoch_loss = []
-    if train:
+    if optimizer:
         model.train()
     else:
         model.eval()
 
     for users, items, (user_key, item_key) in data_loader:
-        playlist_embeds, song_embeds = model(users, items)
-        answers = data.transformed_dataset[list(user_key)]
-        answers[answers != 0] = 1
-        values = []
-        [playlists, songs, ones] = sparse.find(answers)
-        for i, playlist in enumerate(playlists):
-            values.append(dot(playlist_embeds[playlist], song_embeds[np.where(item_key == songs[i])[0][0]]))
-        loss = loss_function(F.sigmoid(stack(values)), tensor(ones))
+        batch_start_time = perf_counter()
+        products = model(users, items)
+        answers = []
+        for user in user_key:
+            test = tensor([np.where(item_key == x)[0][0] for x in sparse.find(data.dataset[user])[2] -1 if x in item_key])
+            row = torch.zeros(len(item_key), dtype=torch.double)
+            row[test] = 1
+            answers.append(row)
+        answers = torch.stack(answers)
+        loss = loss_function(products, answers)
 
         epoch_loss.append(loss.item() * len(users))
 
-        if train:
+        if optimizer and loss_function:
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        batch_end_time = perf_counter()
+        batch_time = batch_end_time-batch_start_time
+        batch_times.append(batch_time)
+        print(f"Batch Time: {batch_time:0.4f} seconds")
+    epoch_end_time = perf_counter()
+    print(f"Epoch Time: {epoch_end_time - epoch_start_time:0.4f} seconds\nAverage Batch Time: {mean(batch_times):0.4f}")
     return sum(epoch_loss) / len(data)
+
+def random_split(length, size=0.1):
+    sequence = list(range(length))
+    random.shuffle(sequence)
+    split = floor(length * (1-size))
+    first = sequence[:split]
+    second = sequence[split:]
+    return list(sorted(first)), list(sorted(second))
 
 def main():
     
@@ -117,26 +148,36 @@ def main():
     # Import Matrix
     matrix = sparse.load_npz(args.matrix)
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-
     # Data creation
-    batch_size = 128
-    data = TrainingDataset(matrix)
-    collator = DataCollator(data)
-    data_loader = DataLoader(data, batch_size=batch_size, shuffle=True, collate_fn=collator)
+    train, validate = random_split(matrix.shape[0], 0.25)
+    batch_size = 64
+    train_data = TrainingDataset(matrix, train)
+    train_collator = DataCollator(train_data)
+    train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=train_collator)
+
+    validate_data = TrainingDataset(matrix, validate)
+    validate_collator = DataCollator(validate_data)
+    validate_data_loader = DataLoader(validate_data, batch_size=batch_size, shuffle=True, collate_fn=validate_collator)
     
     learning_rate = 0.001
     momentum = 0.9
-    model = User_Item_Encoder(*data.shape(), [500,250,100])
+    model = User_Item_Encoder(*train_data.shape(), [10000,5000,2500,1000, 250], [500,250])
     optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum= momentum)
-    loss_function = nn.BCELoss()
+    loss_function = CustomLossFunction()
     
     num_epochs = 25
-    loss_per_epoch = []
+    train_loss_per_epoch = []
+    validate_loss_per_epoch = []
     for epoch in range(num_epochs):
-        training_loss = check_model(data, data_loader, model, optimizer, loss_function, train=True)
-        loss_per_epoch.append(training_loss)
-        print(loss_per_epoch[-1])
+        print(f"{epoch}: Training") 
+        training_loss = check_model(train_data, train_data_loader, model, loss_function, optimizer)
+        train_loss_per_epoch.append(training_loss)
+        print(f"Loss = {train_loss_per_epoch[-1]}")
+        print(f"{epoch}: Validate")
+        validate_loss = check_model(validate_data, validate_data_loader, model, loss_function)
+        validate_loss_per_epoch.append(validate_loss)
+        print(f"Loss = {validate_loss_per_epoch[-1]}")
+
 
 
 
