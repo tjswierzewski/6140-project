@@ -73,6 +73,7 @@ Returns:
     None.
 '''
 def scoring(data, answers):
+    # Sorting playlists.
     for i in range (data.shape[0]):
         data[i] = data[i].argsort()[::-1]
     # Limiting to top recommendations.
@@ -115,7 +116,7 @@ def main():
     print("\nPreparing data...")
     df = ssparse.load_npz("UvS_sparse_matrix_D100.npz")
     # Splitting train and test data.
-    train, test = train_test_split(df, test_size = .1, random_state=STATE_RAND)
+    train, test = train_test_split(df, test_size = .001, random_state=STATE_RAND)
     # Creating queries and answers.
     test_playlists, test_answers = data_to_query_label(test)
     # Swapping.
@@ -127,17 +128,19 @@ def main():
     print(test_playlists.shape)
     # Obtaining feature matrices.
     print("\nObtaining feature matrices...")
-    p_features, s_features = computeFeatureVectors(train, 10, 0.0001)
+    p_features, s_features = computeFeatureVectors(train, 70, 0.0001)
     print("Done!")
     # Predicting training playlists.
     print("\nPredicting test playlist features...")
     p_features = predictPlaylistFeatures(test_playlists, s_features)
     print("Done!")
     # Computing dot product to obtain new playlist data.
-    print("\nPredicting playlist recommendations and scoring...")
+    print("\nPredicting playlist recommendations...")
     new_playlists = np.dot(p_features, s_features.transpose())
+    print("Done!")
     # Scoring.
+    print("\nScoring...")
     scoring(new_playlists, test_answers)
-
+    print("Done!")
 if (__name__ == "__main__"):
     main()
