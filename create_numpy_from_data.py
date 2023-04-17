@@ -106,6 +106,7 @@ def create_user_song_dataframe(songlist, depth, path):
     print(df.shape)
     ssparse.save_npz(f"UvS_sparse_matrix_D{depth}", df)
 
+
 def swap_song_index_to_X(matrix, shape = None):
     [playlist_index, X_index, value] = ssparse.find(matrix)
     swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
@@ -113,6 +114,7 @@ def swap_song_index_to_X(matrix, shape = None):
     recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
     recips = ssparse.csr_matrix(recips)
     swapped_matrix = recips.multiply(swapped_matrix).tocsr() * -1
+    swapped_matrix[swapped_matrix < -1] = -1
     swapped_matrix[swapped_matrix != 0] += 1
     swapped_matrix.sum_duplicates()
     return swapped_matrix
