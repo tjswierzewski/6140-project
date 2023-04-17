@@ -69,11 +69,34 @@ class TrainingDataset(Dataset):
         
     def __len__(self):
         return self.dataset.shape[0]
-    
-    def shape(self):
-        return self.playlist_features.shape[0]
 
-class DataCollator(object):
+    
+class TestingDataset(Dataset):
+    def __init__(self, playlist_features, answers) -> None:
+        super(TestingDataset).__init__()
+        self.answers = answers
+        self.playlist_features = playlist_features
+
+    def __getitem__(self, index):
+        return self.playlist_features[index], self.answers[index]
+        
+    def __len__(self):
+        return self.dataset.shape[0]
+
+
+class SongDataset(Dataset):
+    def __init__(self, song_features) -> None:
+        super(SongDataset).__init__()
+        self.song_features = song_features
+
+    def __getitem__(self, index):
+        return self.song_features[index]
+        
+    def __len__(self):
+        return self.song_features.shape[0]
+
+
+class TrainingDataCollator(object):
     def __init__(self, dataset) -> None:
         self.dataset = dataset
 
@@ -81,6 +104,17 @@ class DataCollator(object):
         users, items = list(zip(*batch))
         songs = np.unique(np.concatenate(items))
         return tensor(np.vstack(users)), tensor(self.dataset.song_features[songs]), items, songs
+    
+class TestingDataCollator(object):
+
+    def __call__(self, batch):
+        playlists, answers = list(zip(*batch))
+        return tensor(np.vstack(playlists)), answers
+
+class SongDataCollator(object):
+
+    def __call__(self, batch):
+        return tensor(np.vstack(batch))  
 
 class CustomLossFunction:
     def __init__(self) -> None:
@@ -152,44 +186,73 @@ def main():
     with open(args.data, "rb") as file:
             data = pickle.load(file)
 
+    training = False
     # Data creation
     # train, validate = random_split(matrix.shape[0], 0.25)
     batch_size = 512
     
     train_data = TrainingDataset(data["train"], data["train_playlist_features"], data["train_song_features"])
-    train_collator = DataCollator(train_data)
+    train_collator = TrainingDataCollator(train_data)
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=train_collator)
 
     validate_data = TrainingDataset(data["validate"], data["validate_playlist_features"], data["train_song_features"])
-    validate_collator = DataCollator(validate_data)
+    validate_collator = TrainingDataCollator(validate_data)
     validate_data_loader = DataLoader(validate_data, batch_size=batch_size, shuffle=False, collate_fn=validate_collator)
     
+    test_data = TestingDataset(data["test_playlist_features"], data["keys"])
+    test_collator = TestingDataCollator()
+    test_data_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False, collate_fn=test_collator)
+
+    song_data = SongDataset(data["train_song_features"])
+    song_collator = SongDataCollator()
+    song_data_loader = DataLoader(song_data, batch_size=batch_size, shuffle=False, collate_fn=song_collator)
+
     learning_rate = 0.001
     momentum = 0.9
     model = User_Item_Encoder(70, 70, [40, 10],)
     optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum= momentum)
     loss_function = CustomLossFunction()
     
-    num_epochs = 50
-    train_loss_per_epoch = []
-    validate_loss_per_epoch = []
-    min_validate_loss = np.inf
-    for epoch in range(num_epochs):
-        print(f"{epoch}: Training") 
-        training_loss = check_model(train_data, train_data_loader, model, loss_function, optimizer)
-        train_loss_per_epoch.append(training_loss)
-        print(f"Loss = {train_loss_per_epoch[-1]}")
-        print(f"{epoch}: Validate")
-        validate_loss = check_model(validate_data, validate_data_loader, model, loss_function)
-        if validate_loss < min_validate_loss:
-            min_validate_loss = validate_loss
-            torch.save(model.state_dict(), "best_model.mdl")
-        validate_loss_per_epoch.append(validate_loss)
-        print(f"Loss = {validate_loss_per_epoch[-1]}")
-    fig, ax = plt.subplots()
-    ax.plot(train_loss_per_epoch)
-    ax.plot(validate_loss_per_epoch)
-    plt.show()
+    if training == True:
+        num_epochs = 25
+        train_loss_per_epoch = []
+        validate_loss_per_epoch = []
+        min_validate_loss = np.inf
+        for epoch in range(num_epochs):
+            print(f"{epoch}: Training") 
+            training_loss = check_model(train_data, train_data_loader, model, loss_function, optimizer)
+            train_loss_per_epoch.append(training_loss)
+            print(f"Loss = {train_loss_per_epoch[-1]}")
+            print(f"{epoch}: Validate")
+            with torch.no_grad():
+                validate_loss = check_model(validate_data, validate_data_loader, model, loss_function)
+            if validate_loss < min_validate_loss:
+                min_validate_loss = validate_loss
+                torch.save(model.state_dict(), "best_model.mdl")
+            validate_loss_per_epoch.append(validate_loss)
+            print(f"Loss = {validate_loss_per_epoch[-1]}")
+        fig, ax = plt.subplots()
+        ax.plot(train_loss_per_epoch)
+        ax.plot(validate_loss_per_epoch)
+        plt.show()
+
+    model.load_state_dict(torch.load("best_model.mdl"))
+    embeded_songs = []
+    with torch.no_grad():
+        for songs in song_data_loader:
+            embeded_songs.append(model.item_encoder(songs))
+        embeded_songs = np.vstack(embeded_songs)
+
+        embedded_playlists=[]
+        answer_key=[]
+        for playlists, keys in test_data_loader:
+            embedded_playlists.append(model.user_encoder(playlists))
+            answer_key.append(keys)
+        embedded_playlists = np.vstack(embedded_playlists)
+        answer_key = np.vstack(answer_key)
+        
+
+
 
 
 
