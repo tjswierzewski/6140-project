@@ -11,6 +11,8 @@ from create_numpy_from_data import SongList, Song, swap_song_index_to_X
 import numpy as np
 from time import perf_counter
 from statistics import mean
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 class User_Item_Encoder(nn.Module):
     def __init__(self, user_features, item_features, layers, item_layers = None) -> None:
@@ -117,7 +119,7 @@ def check_model(data, data_loader, model, loss_function, optimizer = None):
         batch_end_time = perf_counter()
         batch_time = batch_end_time-batch_start_time
         batch_times.append(batch_time)
-        print(f"Batch Time: {batch_time:0.4f} seconds")
+        # print(f"Batch Time: {batch_time:0.4f} seconds")
     epoch_end_time = perf_counter()
     print(f"Epoch Time: {epoch_end_time - epoch_start_time:0.4f} seconds\nAverage Batch Time: {mean(batch_times):0.4f}")
     return sum(epoch_loss) / len(data)
@@ -150,7 +152,7 @@ def main():
 
     # Data creation
     train, validate = random_split(matrix.shape[0], 0.25)
-    batch_size = 512
+    batch_size = 4092
     train_data = TrainingDataset(matrix, train)
     train_collator = DataCollator(train_data)
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=train_collator)
@@ -161,13 +163,14 @@ def main():
     
     learning_rate = 0.001
     momentum = 0.9
-    model = User_Item_Encoder(*train_data.shape(), [1000, 250], [500,250])
+    model = User_Item_Encoder(*train_data.shape(), [500, 100], [250,100])
     optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum= momentum)
     loss_function = CustomLossFunction()
     
-    num_epochs = 25
+    num_epochs = 50
     train_loss_per_epoch = []
     validate_loss_per_epoch = []
+    min_validate_loss = np.inf
     for epoch in range(num_epochs):
         print(f"{epoch}: Training") 
         training_loss = check_model(train_data, train_data_loader, model, loss_function, optimizer)
@@ -175,8 +178,15 @@ def main():
         print(f"Loss = {train_loss_per_epoch[-1]}")
         print(f"{epoch}: Validate")
         validate_loss = check_model(validate_data, validate_data_loader, model, loss_function)
+        if validate_loss < min_validate_loss:
+            min_validate_loss = validate_loss
+            torch.save(model.state_dict(), "best_model.mdl")
         validate_loss_per_epoch.append(validate_loss)
         print(f"Loss = {validate_loss_per_epoch[-1]}")
+    fig, ax = plt.subplots()
+    ax.plot(train_loss_per_epoch)
+    ax.plot(validate_loss_per_epoch)
+    plt.show()
 
 
 
