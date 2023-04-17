@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as ssparse
 import pandas as pd
 from sklearn.decomposition import NMF
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
 from sklearn.model_selection import train_test_split
 from create_numpy_from_data import swap_song_index_to_X, data_to_query_label
 from scoring import full_score
@@ -10,6 +10,8 @@ from scoring import full_score
 DEFINITIONS
 '''
 TOP_X = 500
+MAX_ITER = 500
+STATE_RAND = 1
 '''
 Function: computeFeatureVectors
 This function factors a matrix into two feature matrices using non-negative
@@ -24,7 +26,7 @@ Returns:
 '''
 def computeFeatureVectors(data, components, r):
     factor_model = NMF(n_components=components, init='nndsvd', alpha_W=r,\
-                       random_state=1, max_iter=500)
+                       random_state=STATE_RAND, max_iter=MAX_ITER)
     p_features = factor_model.fit_transform(data)
     s_features = factor_model.components_.transpose()
     return p_features, s_features
@@ -44,23 +46,19 @@ Procedure:
     a standard linear regression model:
     
     Y = X'W, where W needs to be solved for and:
-    Y  : (songs x playlist)
-    X' : (songs x features)
-    W  : (features x playlist)
+    Y  : (songs x features)
+    X' : (songs x playlists)
+    W  : (playlists x features)
 Returns:
     p_features | matrix (playlists x features) -- Playlists whose
     feature vectors are calculated.
 '''
 def predictPlaylistFeatures(data, s_features):
-    p_features = np.zeros((data.shape[0],s_features.shape[1]))
-    for i in range(data.shape[0]):
-        # Wrapping each playlist.
-        y = np.array(data[i].transpose().todense()).ravel()
-        # Obtaining regularization model.
-        reg_model = LinearRegression(fit_intercept=False, positive=True)
-        reg_model.fit(s_features, y)
-        # Obtaining feature vector.
-        p_features[i] = reg_model.coef_
+    # Obtaining regularization model.
+    reg_model = Ridge(fit_intercept=False, positive=True)
+    reg_model.fit(data.transpose(), s_features)
+    # Obtaining feature vector.
+    p_features = reg_model.coef_.transpose()
     return (p_features)
 '''
 Function: scoring
@@ -114,20 +112,29 @@ Returns:
     None.
 '''
 def main():
-    df = ssparse.load_npz("UvS_sparse_matrix_D1.npz")
+    print("\nPreparing data...")
+    df = ssparse.load_npz("UvS_sparse_matrix_D100.npz")
     # Splitting train and test data.
-    train, test = train_test_split(df, test_size = .1, random_state=1)
+    train, test = train_test_split(df, test_size = .1, random_state=STATE_RAND)
     # Creating queries and answers.
     test_playlists, test_answers = data_to_query_label(test)
     # Swapping.
     train = swap_song_index_to_X(train)
     test_playlists = swap_song_index_to_X(test_playlists, \
                                           shape=(len(test_playlists), train.shape[1]))
+    print("Done!")
+    print(train.shape)
+    print(test_playlists.shape)
     # Obtaining feature matrices.
-    p_features, s_features = computeFeatureVectors(train, 70, 0.0001)
+    print("\nObtaining feature matrices...")
+    p_features, s_features = computeFeatureVectors(train, 10, 0.0001)
+    print("Done!")
     # Predicting training playlists.
+    print("\nPredicting test playlist features...")
     p_features = predictPlaylistFeatures(test_playlists, s_features)
+    print("Done!")
     # Computing dot product to obtain new playlist data.
+    print("\nPredicting playlist recommendations and scoring...")
     new_playlists = np.dot(p_features, s_features.transpose())
     # Scoring.
     scoring(new_playlists, test_answers)
