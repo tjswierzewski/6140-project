@@ -4,8 +4,7 @@ import pandas as pd
 from sklearn.decomposition import NMF
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from knn_recomendation import data_to_query_label
-from create_numpy_from_data import swap_song_index_to_X
+from create_numpy_from_data import swap_song_index_to_X, data_to_query_label
 from scoring import full_score
 '''
 DEFINITIONS

@@ -9,37 +9,13 @@ from multiprocessing import Pool
 from functools import partial
 import pandas as pd
 import scipy
-from create_numpy_from_data import swap_song_index_to_X
+from create_numpy_from_data import swap_song_index_to_X, data_to_query_label
 
 ITEM_NEIGHBORS = 200
 USER_NEIGHBORS = 20
 TEST_LENGTH = 10
 TEST_MIN = 20
 REC_LENGTH = 500
-
-def delete_rows_csr(mat, indices):
-    """
-    Remove the rows denoted by ``indices`` form the CSR sparse matrix ``mat``.
-    """
-    if not isinstance(mat, ssparse.csr_matrix):
-        raise ValueError("works only for CSR format -- use .tocsr() first")
-    indices = list(indices)
-    mask = np.ones(mat.shape[0], dtype=bool)
-    mask[indices] = False
-    return mat[mask]
-
-def data_to_query_label(data):
-    query_playlists = data[:,0:10]
-    query_answers = data[:,10:]
-    rows_to_remove = np.where(np.unique(data.nonzero()[0], return_counts=True)[1] < TEST_MIN)[0]
-    query_playlists = delete_rows_csr(query_playlists, rows_to_remove)
-    query_answers = delete_rows_csr(query_answers, rows_to_remove)
-    answers = query_answers.toarray().tolist()
-    answers = [np.trim_zeros(x) for x in answers ]
-    answers = [[x-1 for x in y]for y in answers]
-    query_playlists = query_playlists.toarray().tolist()
-    # query_playlists = [[x-1 for x in y]for y in query_playlists]
-    return query_playlists, answers
 
 def rank_merge(row):
     rank = {}
