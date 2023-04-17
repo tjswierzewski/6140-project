@@ -150,14 +150,14 @@ def main():
 
     # Data creation
     train, validate = random_split(matrix.shape[0], 0.25)
-    batch_size = 64
+    batch_size = 512
     train_data = TrainingDataset(matrix, train)
     train_collator = DataCollator(train_data)
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=train_collator)
 
     validate_data = TrainingDataset(matrix, validate)
     validate_collator = DataCollator(validate_data)
-    validate_data_loader = DataLoader(validate_data, batch_size=batch_size, shuffle=True, collate_fn=validate_collator)
+    validate_data_loader = DataLoader(validate_data, batch_size=batch_size, shuffle=False, collate_fn=validate_collator)
     
     learning_rate = 0.001
     momentum = 0.9
