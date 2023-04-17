@@ -1,5 +1,6 @@
 import argparse
 from math import floor
+import pickle
 import random
 from scipy import sparse
 from sklearn.model_selection import train_test_split
@@ -13,6 +14,8 @@ from time import perf_counter
 from statistics import mean
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+
+from matrixfactor import computeFeatureVectors
 
 class User_Item_Encoder(nn.Module):
     def __init__(self, user_features, item_features, layers, item_layers = None) -> None:
@@ -55,31 +58,29 @@ class User_Item_Encoder(nn.Module):
         return torch.matmul(users, torch.transpose(items, 0 ,1))
     
 class TrainingDataset(Dataset):
-    def __init__(self, dataset, available) -> None:
+    def __init__(self, dataset, playlist_features, song_features) -> None:
         super(TrainingDataset).__init__()
         self.dataset = dataset
-        self.available = available
-        self.transformed_dataset = swap_song_index_to_X(self.dataset)
-        [playlist, song, rank] = sparse.find(self.transformed_dataset)
-        self.song_data = sparse_coo_tensor(np.vstack([song,playlist]), tensor(rank), size=self.transformed_dataset.shape[::-1])
+        self.playlist_features = playlist_features
+        self.song_features = song_features
 
     def __getitem__(self, index):
-        return self.song_data.select(1, self.available[index]), np.trim_zeros(self.dataset[self.available[index]].toarray()[0]) - 1, self.available[index]
+        return self.playlist_features[index], np.trim_zeros(self.dataset[index].toarray()[0]) - 1
         
     def __len__(self):
-        return len(self.available)
+        return self.dataset.shape[0]
     
     def shape(self):
-        return self.song_data.shape
+        return self.playlist_features.shape[0]
 
 class DataCollator(object):
     def __init__(self, dataset) -> None:
         self.dataset = dataset
 
     def __call__(self, batch):
-        users, items, key = list(zip(*batch))
+        users, items = list(zip(*batch))
         songs = np.unique(np.concatenate(items))
-        return stack(users), self.dataset.song_data.index_select(0, tensor(songs)), (key, songs)
+        return tensor(np.vstack(users)), tensor(self.dataset.song_features[songs]), items, songs
 
 class CustomLossFunction:
     def __init__(self) -> None:
@@ -98,12 +99,12 @@ def check_model(data, data_loader, model, loss_function, optimizer = None):
     else:
         model.eval()
 
-    for users, items, (user_key, item_key) in data_loader:
+    for users, items, playlists, item_key in data_loader:
         batch_start_time = perf_counter()
         products = model(users, items)
         answers = []
-        for user in user_key:
-            test = tensor([np.where(item_key == x)[0][0] for x in sparse.find(data.dataset[user])[2] -1 if x in item_key])
+        for playlist, songs in enumerate(playlists):
+            test = tensor([np.where(item_key == x)[0][0] for x in songs])
             row = torch.zeros(len(item_key), dtype=torch.double)
             row[test] = 1
             answers.append(row)
@@ -138,7 +139,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-s", "--songlist", help = "Songlist Pickle", required= True)
-    parser.add_argument("-m", "--matrix", help = "Data Matrix", required= True)
+    parser.add_argument("-d", "--data", help = "Data", required= True)
     parser.add_argument("-S", "--seed", help = "Seed", type= int, default= None)
 
     args = parser.parse_args()
@@ -148,22 +149,24 @@ def main():
     songlist.load(args.songlist)
 
     # Import Matrix
-    matrix = sparse.load_npz(args.matrix)
+    with open(args.data, "rb") as file:
+            data = pickle.load(file)
 
     # Data creation
-    train, validate = random_split(matrix.shape[0], 0.25)
-    batch_size = 4092
-    train_data = TrainingDataset(matrix, train)
+    # train, validate = random_split(matrix.shape[0], 0.25)
+    batch_size = 512
+    
+    train_data = TrainingDataset(data["train"], data["train_playlist_features"], data["train_song_features"])
     train_collator = DataCollator(train_data)
     train_data_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=train_collator)
 
-    validate_data = TrainingDataset(matrix, validate)
+    validate_data = TrainingDataset(data["validate"], data["validate_playlist_features"], data["train_song_features"])
     validate_collator = DataCollator(validate_data)
     validate_data_loader = DataLoader(validate_data, batch_size=batch_size, shuffle=False, collate_fn=validate_collator)
     
     learning_rate = 0.001
     momentum = 0.9
-    model = User_Item_Encoder(*train_data.shape(), [500, 100], [250,100])
+    model = User_Item_Encoder(70, 70, [40, 10],)
     optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum= momentum)
     loss_function = CustomLossFunction()
     
