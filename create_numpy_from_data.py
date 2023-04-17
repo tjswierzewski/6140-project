@@ -107,6 +107,18 @@ def create_user_song_dataframe(songlist, depth, path):
     ssparse.save_npz(f"UvS_sparse_matrix_D{depth}", df)
 
 
+def delete_rows_csr(mat, indices):
+    """
+    Remove the rows denoted by ``indices`` form the CSR sparse matrix ``mat``.
+    """
+    if not isinstance(mat, ssparse.csr_matrix):
+        raise ValueError("works only for CSR format -- use .tocsr() first")
+    indices = list(indices)
+    mask = np.ones(mat.shape[0], dtype=bool)
+    mask[indices] = False
+    return mat[mask]
+
+
 def swap_song_index_to_X(matrix, shape = None):
     [playlist_index, X_index, value] = ssparse.find(matrix)
     swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
@@ -118,6 +130,18 @@ def swap_song_index_to_X(matrix, shape = None):
     swapped_matrix[swapped_matrix != 0] += 1
     swapped_matrix.sum_duplicates()
     return swapped_matrix
+
+def data_to_query_label(data, query_length = 20):
+    query_playlists = data[:,0:10]
+    query_answers = data[:,10:]
+    rows_to_remove = np.where(np.unique(data.nonzero()[0], return_counts=True)[1] < query_length)[0]
+    query_playlists = delete_rows_csr(query_playlists, rows_to_remove)
+    query_answers = delete_rows_csr(query_answers, rows_to_remove)
+    answers = query_answers.toarray().tolist()
+    answers = [np.trim_zeros(x) for x in answers ]
+    answers = [[x-1 for x in y]for y in answers]
+    query_playlists = query_playlists.toarray().tolist()
+    return query_playlists, answers
 
 def main():
 
