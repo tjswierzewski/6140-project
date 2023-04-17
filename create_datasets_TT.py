@@ -35,8 +35,9 @@ def main():
     output["keys"] = keys
     output["train"] = train
     output["validate"] = validate
+    output["test"] = test
 
-    with open("NN_data_D1.pickle", "wb") as file:
+    with open("NN_data_D10.pickle", "wb") as file:
             pickle.dump(output, file)
 
 

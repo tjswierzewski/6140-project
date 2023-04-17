@@ -14,8 +14,10 @@ from time import perf_counter
 from statistics import mean
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from knn_recomendation import get_song_based_recommendations
 
 from matrixfactor import computeFeatureVectors
+from scoring import full_score
 
 class User_Item_Encoder(nn.Module):
     def __init__(self, user_features, item_features, layers, item_layers = None) -> None:
@@ -237,23 +239,25 @@ def main():
         plt.show()
 
     model.load_state_dict(torch.load("best_model.mdl"))
-    embeded_songs = []
+    embedded_songs = []
     with torch.no_grad():
         for songs in song_data_loader:
-            embeded_songs.append(model.item_encoder(songs))
-        embeded_songs = np.vstack(embeded_songs)
+            embedded_songs.append(model.item_encoder(songs))
+        embedded_songs = np.vstack(embedded_songs)
 
-        embedded_playlists=[]
-        answer_key=[]
-        for playlists, keys in test_data_loader:
-            embedded_playlists.append(model.user_encoder(playlists))
-            answer_key.append(keys)
-        embedded_playlists = np.vstack(embedded_playlists)
-        answer_key = np.vstack(answer_key)
-        
+        # embedded_playlists=[]
+        # answer_key=[]
+        # for playlists, keys in test_data_loader:
+        #     embedded_playlists.append(model.user_encoder(playlists))
+        #     answer_key.append(keys)
+        # embedded_playlists = np.vstack(embedded_playlists)
+        # answer_key = np.vstack(answer_key)
 
-
-
+    item_recommendations = get_song_based_recommendations(embedded_songs, data["test"])
+    item_based_scores = list(map(lambda given, recommended: full_score(given, recommended), data['keys'], item_recommendations))
+    np_item_based_scores = np.array(item_based_scores)
+    mean = np.mean(np_item_based_scores, axis=0)
+    print(f"\nItem Based Average:\nR_Precision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
 
 
 
