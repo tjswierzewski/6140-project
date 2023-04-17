@@ -38,7 +38,7 @@ def data_to_query_label(data):
     answers = [np.trim_zeros(x) for x in answers ]
     answers = [[x-1 for x in y]for y in answers]
     query_playlists = query_playlists.toarray().tolist()
-    query_playlists = [[x-1 for x in y]for y in query_playlists]
+    # query_playlists = [[x-1 for x in y]for y in query_playlists]
     return query_playlists, answers
 
 def rank_merge(row):
@@ -61,6 +61,7 @@ def remove_zeros(l):
             break
 
 def get_song_based_recommendations(data, query_playlists):
+    query_playlists = [[x-1 for x in y]for y in query_playlists]
     model = NearestNeighbors(n_neighbors = ITEM_NEIGHBORS, metric='cosine', n_jobs=-1)
     model.fit(data)
     song_list = np.unique(query_playlists)
