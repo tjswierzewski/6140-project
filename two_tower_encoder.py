@@ -161,7 +161,7 @@ def main():
     
     learning_rate = 0.001
     momentum = 0.9
-    model = User_Item_Encoder(*train_data.shape(), [10000,5000,2500,1000, 250], [500,250])
+    model = User_Item_Encoder(*train_data.shape(), [1000, 250], [500,250])
     optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum= momentum)
     loss_function = CustomLossFunction()
     
