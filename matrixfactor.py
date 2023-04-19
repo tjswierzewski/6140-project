@@ -114,7 +114,7 @@ Returns:
 '''
 def main():
     print("\nPreparing data...")
-    df = ssparse.load_npz("UvS_sparse_matrix_D100.npz")
+    df = ssparse.load_npz("UvS_sparse_matrix_D10.npz")
     # Splitting train and test data.
     train, test = train_test_split(df, test_size = .001, random_state=STATE_RAND)
     # Creating queries and answers.

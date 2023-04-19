@@ -17,7 +17,7 @@ TEST_LENGTH = 10
 TEST_MIN = 20
 REC_LENGTH = 500
 
-def rank_merge(row):
+def rank_merge(row, full_out = False):
     rank = {}
     def aggregate(list):
         for index, song_index in enumerate(list):
@@ -27,6 +27,8 @@ def rank_merge(row):
                 rank[song_index] += 1 - (index / (len(list)))
     row.map(aggregate)
     sorted_rank = sorted(rank.items(), key=lambda x:x[1], reverse=True)
+    if full_out:
+        return [x for x in sorted_rank][:500]    
     return [x[0] for x in sorted_rank][:500]
 
 def remove_zeros(l):
@@ -99,10 +101,10 @@ def main():
     # Average Playlist Scores    
     np_item_based_scores = np.array(item_based_scores)
     mean = np.mean(np_item_based_scores, axis=0)
-    print(f"\nItem Based Average:\nR_Percision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
+    print(f"\nItem Based Average:\nR_Precision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
 
     mean = np.mean(np_user_based_scores, axis=0)
-    print(f"\nUser Based Average:\nR_Percision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
+    print(f"\nUser Based Average:\nR_Precision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}\n")
 
 if __name__ == "__main__":
     main()
