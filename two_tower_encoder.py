@@ -188,7 +188,7 @@ def main():
     with open(args.data, "rb") as file:
             data = pickle.load(file)
 
-    training = False
+    training = True
     # Data creation
     # train, validate = random_split(matrix.shape[0], 0.25)
     batch_size = 512
@@ -211,12 +211,12 @@ def main():
 
     learning_rate = 0.001
     momentum = 0.9
-    model = User_Item_Encoder(70, 70, [40, 10],)
+    model = User_Item_Encoder(100, 100, [75, 50, 25],)
     optimizer = optim.SGD(model.parameters(), lr = learning_rate, momentum= momentum)
     loss_function = CustomLossFunction()
     
     if training == True:
-        num_epochs = 25
+        num_epochs = 250
         train_loss_per_epoch = []
         validate_loss_per_epoch = []
         min_validate_loss = np.inf

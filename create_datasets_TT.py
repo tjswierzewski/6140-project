@@ -27,7 +27,7 @@ def main():
     test, keys = data_to_query_label(test)
 
     output = {}
-    train_playlist_features, train_song_features = computeFeatureVectors(swap_song_index_to_X(train, shape=(train.shape[0], matrix.max())), 70, 0.0001)
+    train_playlist_features, train_song_features = computeFeatureVectors(swap_song_index_to_X(train, shape=(train.shape[0], matrix.max())), 100, 0.0001)
     output["train_playlist_features"] = train_playlist_features
     output["train_song_features"] = train_song_features
     output["validate_playlist_features"] = predictPlaylistFeatures(swap_song_index_to_X(validate, shape=(validate.shape[0], matrix.max())), train_song_features)

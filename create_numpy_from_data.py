@@ -119,16 +119,20 @@ def delete_rows_csr(mat, indices):
     return mat[mask]
 
 
-def swap_song_index_to_X(matrix, shape = None):
+def swap_song_index_to_X(matrix, shape = None, value='linear'):
     [playlist_index, X_index, value] = ssparse.find(matrix)
     swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
-    # Normalize before summing duplicates
-    recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
-    recips = ssparse.csr_matrix(recips)
-    swapped_matrix = recips.multiply(swapped_matrix).tocsr() * -1
-    swapped_matrix[swapped_matrix < -1] = -1
-    swapped_matrix[swapped_matrix != 0] += 1
-    swapped_matrix.sum_duplicates()
+    if value == 'linear':
+        # Normalize before summing duplicates
+        recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
+        recips = ssparse.csr_matrix(recips)
+        swapped_matrix = recips.multiply(swapped_matrix).tocsr() * -1
+        swapped_matrix[swapped_matrix < -1] = -1
+        swapped_matrix[swapped_matrix != 0] += 1
+        swapped_matrix.sum_duplicates()
+    elif value == 'binary':
+        swapped_matrix.sum_duplicates()
+        swapped_matrix[swapped_matrix != 0] = 1
     return swapped_matrix
 
 def data_to_query_label(data, query_length = 20):
