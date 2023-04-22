@@ -14,6 +14,7 @@ def main():
     parser.add_argument("-S", "--seed", help = "Seed", type= int, default= None)
     parser.add_argument("-v", "--validation", help = "size of training data used for validation", type=float)
     parser.add_argument("-f", "--features", help = "Number of features in MF", type=int, default=100)
+    parser.add_argument("-r", "--reducer", choices=["linear","binary"], default="binary")
 
     args = parser.parse_args()
 
@@ -25,18 +26,18 @@ def main():
     test, keys = data_to_query_label(test)
 
     output = {}
-    train_playlist_features, train_song_features = computeFeatureVectors(swap_song_index_to_X(train, shape=(train.shape[0], matrix.max())), args.features, 0.0001)
+    train_playlist_features, train_song_features = computeFeatureVectors(swap_song_index_to_X(train, shape=(train.shape[0], matrix.max()), reducer=args.reducer), args.features, 0.0001)
     output["train_playlist_features"] = train_playlist_features
     output["train_song_features"] = train_song_features
     output["train"] = train
     if args.validation != None:
-        output["validate_playlist_features"] = predictPlaylistFeatures(swap_song_index_to_X(validate, shape=(validate.shape[0], matrix.max())), train_song_features)
+        output["validate_playlist_features"] = predictPlaylistFeatures(swap_song_index_to_X(validate, shape=(validate.shape[0], matrix.max()), reducer=args.reducer), train_song_features)
         output["validate"] = validate
-    output["test_playlist_features"] = predictPlaylistFeatures(swap_song_index_to_X(test, shape=(len(test), matrix.max())), train_song_features)
+    output["test_playlist_features"] = predictPlaylistFeatures(swap_song_index_to_X(test, shape=(len(test), matrix.max()), reducer=args.reducer), train_song_features)
     output["test"] = test
     output["keys"] = keys
 
-    file_name = args.matrix.split("_")[-1].split(".")[0] + f"_F{args.features}"
+    file_name = args.matrix.split("_")[-1].split(".")[0] + "_" + args.reducer +  f"_F{args.features}"
     if args.validation:
         file_name += "_V"
     file_name += ".pickle"
