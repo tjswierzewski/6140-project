@@ -5,6 +5,7 @@ import pickle
 import re
 import numpy as np
 import scipy.sparse as ssparse
+from sklearn.model_selection import train_test_split
 
 class Song:
     def __init__(self, name, track_uri) -> None:
@@ -149,16 +150,18 @@ def swap_song_index_to_X(matrix, shape = None, reducer='linear'):
         swapped_matrix[swapped_matrix != 0] = 1
     return swapped_matrix
 
-def data_to_query_label(data, query_length = 20):
-    query_playlists = data[:,0:10]
-    query_answers = data[:,10:]
-    rows_to_remove = np.where(np.unique(data.nonzero()[0], return_counts=True)[1] < query_length)[0]
+def data_to_query_label(data, query_length = 10, min_key_length = 10, max_return = None):
+    query_playlists = data[:,0:query_length]
+    query_answers = data[:,query_length:]
+    rows_to_remove = np.where(np.unique(data.nonzero()[0], return_counts=True)[1] < query_length + min_key_length)[0]
     query_playlists = delete_rows_csr(query_playlists, rows_to_remove)
     query_answers = delete_rows_csr(query_answers, rows_to_remove)
     answers = query_answers.toarray().tolist()
-    answers = [np.trim_zeros(x) for x in answers ]
+    answers = [np.trim_zeros(x) for x in answers]
     answers = [[x-1 for x in y]for y in answers]
     query_playlists = query_playlists.toarray().tolist()
+    if max_return and max_return < len(query_playlists):
+        query_playlists, _, answers, _ = train_test_split(query_playlists, answers, train_size=max_return)
     return query_playlists, answers
 
 def main():
