@@ -11,8 +11,10 @@ DEFINITIONS
 TOP_X = 500
 MAX_ITER = 500
 STATE_RAND = 1
-FEATURES = 40
+FEATURES = 10
 QUERY_LENGTH = 10
+KEY_LENGTH = 10
+TEST_PLAYLIST_COUNT = 1000
 '''
 Function: computeFeatureVectors
 This function factors a matrix into two feature matrices using non-negative
@@ -170,21 +172,24 @@ def main():
     # Splitting train and test data.
     train, test = train_test_split(df, test_size=.1, random_state=STATE_RAND)
     # Creating queries and answers from test data.
-    test_queries, test_answers = data_to_query_label(test)
+    test_queries, test_answers = data_to_query_label(test, query_length=QUERY_LENGTH, \
+                                                     min_key_length=KEY_LENGTH, \
+                                                     max_return=TEST_PLAYLIST_COUNT)
     print("swap")
     # Swapping.
     train = swap_song_index_to_X(train, shape=None, reducer='binary')
     test = swap_song_index_to_X(test_queries, shape=(len(test_queries), train.shape[1]), reducer='binary')
     print("MF")
     # Obtaining feature matrices.
-    p_features, s_features = computeFeatureVectors(train[0:1000], FEATURES, 0.0001)
+    p_features, s_features = computeFeatureVectors(train, FEATURES, 0.0001)
     #np.savetxt("s_D1000_" + str(FEATURES) + ".csv", s_features, delimiter=",")
     # Predicting training playlists.
     #s_features = np.load("s_D1000_70.npz")
     #s_features = s_features[s_features.files[0]]
     # Recommending songs for a maximum of 1000 test playlists..
     print("reccs")
-    recommendations = getRecommendations(test[0:min(test.shape[0],1000)], s_features, test_queries)
+    print(test.shape)
+    recommendations = getRecommendations(test, s_features, test_queries)
     # Scoring.
     scoring(recommendations, test_answers)
 if __name__ == "__main__":
