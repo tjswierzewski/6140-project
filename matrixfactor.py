@@ -11,7 +11,7 @@ DEFINITIONS
 TOP_X = 500
 MAX_ITER = 500
 STATE_RAND = 1
-FEATURES = 70
+FEATURES = 40
 QUERY_LENGTH = 10
 '''
 Function: computeFeatureVectors
@@ -26,6 +26,7 @@ Returns:
     s_features | matrix (songs x features)
 '''
 def computeFeatureVectors(data, components, r):
+    print(data.shape)
     factor_model = NMF(n_components=components, init='nndsvd', alpha_W=r,\
                        random_state=STATE_RAND, max_iter=MAX_ITER)
     p_features = factor_model.fit_transform(data)
@@ -163,22 +164,26 @@ Returns:
     None.
 '''
 def main():
+    print("load")
     # Loading data.
-    df = ssparse.load_npz("UvS_sparse_matrix_D1000.npz")
+    df = ssparse.load_npz("UvS_sparse_matrix_D10.npz")
     # Splitting train and test data.
     train, test = train_test_split(df, test_size=.1, random_state=STATE_RAND)
     # Creating queries and answers from test data.
     test_queries, test_answers = data_to_query_label(test)
+    print("swap")
     # Swapping.
-    train = swap_song_index_to_X(train)
-    test = swap_song_index_to_X(test_queries, shape=(len(test_queries), train.shape[1]))
+    train = swap_song_index_to_X(train, shape=None, reducer='binary')
+    test = swap_song_index_to_X(test_queries, shape=(len(test_queries), train.shape[1]), reducer='binary')
+    print("MF")
     # Obtaining feature matrices.
-    #p_features, s_features = computeFeatureVectors(train, FEATURES, 0.0001)
+    p_features, s_features = computeFeatureVectors(train[0:1000], FEATURES, 0.0001)
     #np.savetxt("s_D1000_" + str(FEATURES) + ".csv", s_features, delimiter=",")
     # Predicting training playlists.
-    s_features = np.load("s_D1000_70.npz")
-    s_features = s_features[s_features.files[0]]
+    #s_features = np.load("s_D1000_70.npz")
+    #s_features = s_features[s_features.files[0]]
     # Recommending songs for a maximum of 1000 test playlists..
+    print("reccs")
     recommendations = getRecommendations(test[0:min(test.shape[0],1000)], s_features, test_queries)
     # Scoring.
     scoring(recommendations, test_answers)
