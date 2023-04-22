@@ -10,6 +10,7 @@ class Song:
     def __init__(self, name, track_uri) -> None:
         self.name = name
         self.uri = track_uri
+        self.count = 1
 
     @staticmethod
     def truncate_uri(uri):
@@ -48,7 +49,13 @@ class SongList:
         if len(self.list) != 0 and index != len(self.list) and self.list[index].uri == song_uri:
             return index
         return None
-        
+
+    def get_song_probability(self, index):
+        return self.list[index].count/len(self.list)
+    
+    def get_song_name(self,index):
+        return self.list[index].name
+
     def save(self, filename):
         with open(filename, "wb") as file:
             pickle.dump(self.list, file)
@@ -68,10 +75,17 @@ def create_song_list(depth = 1, path = ".."):
         data = json.load(f)
     
         for playlist in data["playlists"]:
+            playlist_songs = []
             for song in playlist["tracks"]:
-                if not songs.search(Song.truncate_uri(song["track_uri"])):
+                index = songs.search(Song.truncate_uri(song["track_uri"]))
+                if not index:
                     object = Song.from_MFD(song)
                     songs.insert(object)
+                    playlist_songs.append(song['track_uri'])
+                else:
+                    if song['track_uri'] not in playlist:
+                        songs.list[index].count += 1
+                        playlist_songs.append(song['track_uri'])
     
         start = start + step
         stop = stop + step
