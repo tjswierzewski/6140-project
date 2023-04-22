@@ -126,7 +126,7 @@ class CustomLossFunction:
         return self.__loss(product, key)
 
 
-def check_model(data, data_loader, model, loss_function, optimizer = None):
+def check_model(data, data_loader, model, loss_function, songlist, optimizer = None):
     epoch_start_time = perf_counter()
     batch_times = []
     epoch_loss = []
@@ -145,6 +145,10 @@ def check_model(data, data_loader, model, loss_function, optimizer = None):
             row[test] = 1
             answers.append(row)
         answers = torch.stack(answers)
+        weights = torch.zeros(len(item_key), dtype=torch.double)
+        for i, song_index in enumerate(item_key):
+            weights[i] = songlist.get_song_probability(song_index)
+        products = products - ((weights * 100)*((answers * -1) + 1))
         loss = loss_function(products, answers)
 
         epoch_loss.append(loss.item() * len(users))
@@ -216,18 +220,18 @@ def main():
     loss_function = CustomLossFunction()
     
     if training == True:
-        num_epochs = 250
+        num_epochs = 50
         train_loss_per_epoch = []
         validate_loss_per_epoch = []
         min_validate_loss = np.inf
         for epoch in range(num_epochs):
             print(f"{epoch}: Training") 
-            training_loss = check_model(train_data, train_data_loader, model, loss_function, optimizer)
+            training_loss = check_model(train_data, train_data_loader, model, loss_function, songlist, optimizer)
             train_loss_per_epoch.append(training_loss)
             print(f"Loss = {train_loss_per_epoch[-1]}")
             print(f"{epoch}: Validate")
             with torch.no_grad():
-                validate_loss = check_model(validate_data, validate_data_loader, model, loss_function)
+                validate_loss = check_model(validate_data, validate_data_loader, model, loss_function, songlist)
             if validate_loss < min_validate_loss:
                 min_validate_loss = validate_loss
                 torch.save(model.state_dict(), "best_model.mdl")
