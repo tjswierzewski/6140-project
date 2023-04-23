@@ -83,7 +83,7 @@ class TestingDataset(Dataset):
         return self.playlist_features[index], self.answers[index]
         
     def __len__(self):
-        return self.dataset.shape[0]
+        return self.playlist_features.shape[0]
 
 
 class SongDataset(Dataset):
@@ -145,10 +145,11 @@ def check_model(data, data_loader, model, loss_function, songlist, optimizer = N
             row[test] = 1
             answers.append(row)
         answers = torch.stack(answers)
-        weights = torch.zeros(len(item_key), dtype=torch.double)
-        for i, song_index in enumerate(item_key):
-            weights[i] = songlist.get_song_probability(song_index)
-        products = products - ((weights * 100)*((answers * -1) + 1))
+        # weights = torch.zeros(len(item_key), dtype=torch.double)
+        # for i, song_index in enumerate(item_key):
+        #     weights[i] = songlist.get_song_probability(song_index)
+        # products = products - ((weights * 100)*((answers * -1) + 1))
+        # products = F.relu(products)
         loss = loss_function(products, answers)
 
         epoch_loss.append(loss.item() * len(users))
@@ -181,6 +182,7 @@ def main():
     parser.add_argument("-s", "--songlist", help = "Songlist Pickle", required= True)
     parser.add_argument("-d", "--data", help = "Data", required= True)
     parser.add_argument("-S", "--seed", help = "Seed", type= int, default= None)
+    parser.add_argument("-m", "--model", help = "Model", default= None)
 
     args = parser.parse_args()
 
@@ -192,10 +194,10 @@ def main():
     with open(args.data, "rb") as file:
             data = pickle.load(file)
 
-    training = True
+    training = not args.model
     # Data creation
     # train, validate = random_split(matrix.shape[0], 0.25)
-    batch_size = 512
+    batch_size = 16
     
     train_data = TrainingDataset(data["train"], data["train_playlist_features"], data["train_song_features"])
     train_collator = TrainingDataCollator(train_data)
@@ -220,7 +222,7 @@ def main():
     loss_function = CustomLossFunction()
     
     if training == True:
-        num_epochs = 50
+        num_epochs = 20
         train_loss_per_epoch = []
         validate_loss_per_epoch = []
         min_validate_loss = np.inf
@@ -242,20 +244,23 @@ def main():
         ax.plot(validate_loss_per_epoch)
         plt.show()
 
-    model.load_state_dict(torch.load("best_model.mdl"))
+    model_file = args.model or "best_model.mdl"
+    model.load_state_dict(torch.load(model_file))
     embedded_songs = []
     with torch.no_grad():
         for songs in song_data_loader:
             embedded_songs.append(model.item_encoder(songs))
         embedded_songs = np.vstack(embedded_songs)
 
-        # embedded_playlists=[]
-        # answer_key=[]
-        # for playlists, keys in test_data_loader:
-        #     embedded_playlists.append(model.user_encoder(playlists))
-        #     answer_key.append(keys)
-        # embedded_playlists = np.vstack(embedded_playlists)
-        # answer_key = np.vstack(answer_key)
+        embedded_playlists=[]
+        answer_key=[]
+        for playlists, keys in test_data_loader:
+            embedded_playlists.append(model.user_encoder(playlists))
+            answer_key.extend(keys)
+        embedded_playlists = np.vstack(embedded_playlists)
+
+    relation = np.matmul(embedded_playlists, embedded_songs.T)
+    recs = np.argsort(relation, axis = 0)
 
     item_recommendations = get_song_based_recommendations(embedded_songs, data["test"])
     item_based_scores = list(map(lambda given, recommended: full_score(given, recommended), data['keys'], item_recommendations))
