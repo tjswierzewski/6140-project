@@ -3,18 +3,20 @@ import scipy.sparse as ssparse
 from sklearn.decomposition import NMF
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import train_test_split
-from create_numpy_from_data import swap_song_index_to_X, data_to_query_label, Song, SongList
+from create_numpy_from_data import swap_song_index_to_X, data_to_query_label
 from scoring import full_score
+
 '''
 DEFINITIONS
 '''
 TOP_X = 500
 MAX_ITER = 500
 STATE_RAND = 1
-FEATURES = 10
-QUERY_LENGTH = 10
+FEATURES = 75
+QUERY_LENGTH = 1
 KEY_LENGTH = 10
 TEST_PLAYLIST_COUNT = 1000
+REDUCTION = "binary"
 '''
 Function: computeFeatureVectors
 This function factors a matrix into two feature matrices using non-negative
@@ -27,13 +29,16 @@ Returns:
     p_features | matrix (playlists x features)
     s_features | matrix (songs x features)
 '''
+
+
 def computeFeatureVectors(data, components, r):
-    print(data.shape)
-    factor_model = NMF(n_components=components, init='nndsvd', alpha_W=r,\
+    factor_model = NMF(n_components=components, init='nndsvd', alpha_W=r, \
                        random_state=STATE_RAND, max_iter=MAX_ITER)
     p_features = factor_model.fit_transform(data)
     s_features = factor_model.components_.transpose()
     return p_features, s_features
+
+
 '''
 Function: predictPlaylistFeatures
 This function predicts playlist feature vectors from known playlist 
@@ -48,7 +53,7 @@ Procedure:
     initially computed via matrix factorization, but whose subset
     of songs are known, the playlist features can be estimated using
     a standard linear regression model:
-    
+
     Y = X'W, where W needs to be solved for and:
     Y  : (songs x playlists)
     X' : (features x songs)
@@ -56,6 +61,8 @@ Procedure:
 Returns:
     A playlists whose feature vector is calculated.
 '''
+
+
 def predictPlaylistFeatures(playlist, s_features):
     # Densifying.
     playlist = playlist.toarray()
@@ -66,6 +73,8 @@ def predictPlaylistFeatures(playlist, s_features):
     # Obtaining playlist feature vector.
     p_features = reg_model.coef_
     return p_features
+
+
 '''
 Function: removeDuplicates
 This function removes duplicates from a recommendations list 
@@ -79,6 +88,8 @@ Parameters:
 Returns:
     The updated list of recommendations.
 '''
+
+
 def removeDuplicates(recommendations, existing_playlist):
     i = 0
     while i < (len(recommendations)):
@@ -87,6 +98,8 @@ def removeDuplicates(recommendations, existing_playlist):
         else:
             i += 1
     return recommendations
+
+
 '''
 Function: getRecommendations
 This function gets the recommendations for each playlist in a list
@@ -102,6 +115,8 @@ Parameters:
 Returns:
     The list of all recommendations for each playlist.
 '''
+
+
 def getRecommendations(playlists, s_features, test_queries):
     # Storage for recommendations.
     recommendation_list = np.zeros((playlists.shape[0], TOP_X))
@@ -116,6 +131,8 @@ def getRecommendations(playlists, s_features, test_queries):
         # Truncate to 500 recommendations and store.
         recommendation_list[i] = recommendations[:TOP_X]
     return recommendation_list
+
+
 '''
 Function: scoring
 This function performs scoring operations for the computed
@@ -128,6 +145,8 @@ Parameters:
 Returns:
     None.
 '''
+
+
 def scoring(recommendations, answers):
     # Stats.
     zero_count = 0
@@ -157,6 +176,8 @@ def scoring(recommendations, answers):
     print("Avg Clicks: " + str(avg_clicks))
     print("Zero Click Count: " + str(zero_count))
     print("Loss Click Count: " + str(loss_count))
+
+
 '''
 Function: main
 This function is the main driver of the program.
@@ -165,32 +186,37 @@ Parameters:
 Returns:
     None.
 '''
+
+
 def main():
-    print("load")
+    print("Load")
     # Loading data.
-    df = ssparse.load_npz("UvS_sparse_matrix_D10.npz")
+    df = ssparse.load_npz("UvS_sparse_matrix_D1000.npz")
     # Splitting train and test data.
     train, test = train_test_split(df, test_size=.1, random_state=STATE_RAND)
     # Creating queries and answers from test data.
     test_queries, test_answers = data_to_query_label(test, query_length=QUERY_LENGTH, \
                                                      min_key_length=KEY_LENGTH, \
                                                      max_return=TEST_PLAYLIST_COUNT)
-    print("swap")
+    print("Swap")
     # Swapping.
-    train = swap_song_index_to_X(train, shape=None, reducer='binary')
-    test = swap_song_index_to_X(test_queries, shape=(len(test_queries), train.shape[1]), reducer='binary')
-    print("MF")
+    train = swap_song_index_to_X(train, shape=None, reducer=REDUCTION)
+    test = swap_song_index_to_X(test_queries, shape=(len(test_queries), train.shape[1]), reducer=REDUCTION)
     # Obtaining feature matrices.
-    p_features, s_features = computeFeatureVectors(train, FEATURES, 0.0001)
-    #np.savetxt("s_D1000_" + str(FEATURES) + ".csv", s_features, delimiter=",")
+    print("Matrix Factorization")
+    # p_features, s_features = computeFeatureVectors(train, FEATURES, 0.0001)
+    # np.savez("s_D1000" + "_f" + str(FEATURES) + "_" + str(REDUCTION) + ".npz", s_features=s_features)
     # Predicting training playlists.
-    #s_features = np.load("s_D1000_70.npz")
-    #s_features = s_features[s_features.files[0]]
+    s_features = np.load("s_D1000_f75_binary.npz")
+    s_features = s_features["s_features"]
     # Recommending songs for a maximum of 1000 test playlists..
-    print("reccs")
+    print("Recommendations")
     print(test.shape)
     recommendations = getRecommendations(test, s_features, test_queries)
     # Scoring.
+    print("Scoring")
     scoring(recommendations, test_answers)
+
+
 if __name__ == "__main__":
     main()
