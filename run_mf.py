@@ -22,7 +22,7 @@ f.close()
 for query, test_size, feature in product(query_length, test_sizes, features):
     with open("mf_out.txt", "a") as f:
         f.write(f"\nQuery Length: {query} Test Length: {test_size} Latent Features: {feature}")
-    train, test = train_test_split(matrix, test_size = 0.05)
+    train, test = train_test_split(matrix, test_size = 0.1)
     test_queries, test_answers = data_to_query_label(test, query_length=query, max_return=test_size)
     Train = swap_song_index_to_X(train, shape=(train.shape[0], matrix.max()), reducer=reducer)
     Test = swap_song_index_to_X(test, shape=(test.shape[0], matrix.max()), reducer=reducer)

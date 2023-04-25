@@ -20,7 +20,7 @@ f.close()
 for query, test_size in product(query_length, test_sizes):
     with open("knn_out.txt", "a") as f:
         f.write(f"\nQuery Length: {query} Test Length: {test_size}")
-    train, test = train_test_split(matrix, test_size = 0.05)
+    train, test = train_test_split(matrix, test_size = 0.1)
     query_playlists, query_answers = data_to_query_label(test, query_length=query, max_return=test_size)
     Train = swap_song_index_to_X(train, shape=(matrix.shape[0], matrix.max()), reducer=reducer)
 
