@@ -25,7 +25,7 @@ for query, test_size, feature in product(query_length, test_sizes, features):
     train, test = train_test_split(matrix, test_size = 0.1)
     test_queries, test_answers = data_to_query_label(test, query_length=query, max_return=test_size)
     Train = swap_song_index_to_X(train, shape=(train.shape[0], matrix.max()), reducer=reducer)
-    Test = swap_song_index_to_X(test, shape=(test.shape[0], matrix.max()), reducer=reducer)
+    Test = swap_song_index_to_X(test_queries, shape=(test_queries.shape[0], matrix.max()), reducer=reducer)
     compute_start = perf_counter_ns()
     playlist_features, song_features = computeFeatureVectors(Train, feature, 0.0001)
     compute_stop = perf_counter_ns()
