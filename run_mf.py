@@ -16,11 +16,13 @@ reducer = "binary"
 
 matrix = sparse.load_npz("UvS_sparse_matrix_D1000.npz")
 f = open("mf_out.txt", "w")
-
 f.write("--------MF Recommender--------")
+f.close()
+
 for query, test_size, feature in product(query_length, test_sizes, features):
-    f.write(f"\nQuery Length: {query} Test Length: {test_size} Latent Features: {feature}")
-    train, test = train_test_split(matrix, test_size = 0.01)
+    with open("mf_out.txt", "a") as f:
+        f.write(f"\nQuery Length: {query} Test Length: {test_size} Latent Features: {feature}")
+    train, test = train_test_split(matrix, test_size = 0.05)
     test_queries, test_answers = data_to_query_label(test, query_length=query, max_return=test_size)
     Train = swap_song_index_to_X(train, shape=(train.shape[0], matrix.max()), reducer=reducer)
     Test = swap_song_index_to_X(test, shape=(test.shape[0], matrix.max()), reducer=reducer)
@@ -36,7 +38,8 @@ for query, test_size, feature in product(query_length, test_sizes, features):
     counts = np.unique(np_scores, return_counts = True)
     no_click = counts[1][0] if counts[0][0] == 0 else 0
     no_find = counts[1][-1] if counts[0][-1] == 51 else 0
-    f.write(f"\nN = {len(test_queries)}")
-    f.write(f"Item Based Average:\nR_Precision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}")
-    f.write(f"No Click: {no_click}\nNo Find: {no_find}")
-    f.write(f"Compute Time: {compute_stop- compute_start}\nRecommend Time: {recommend_stop - recommend_start}")
+    with open("mf_out.txt", "a") as f:
+        f.write(f"\nN = {len(test_queries)}")
+        f.write(f"Item Based Average:\nR_Precision: {mean[0]}\nNormalized Discounted Cumulative Gain: {mean[1]}\nRecommended Song Clicks: {mean[2]}")
+        f.write(f"No Click: {no_click}\nNo Find: {no_find}")
+        f.write(f"Compute Time: {compute_stop- compute_start}\nRecommend Time: {recommend_stop - recommend_start}")
