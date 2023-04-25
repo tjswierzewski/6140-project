@@ -6,6 +6,7 @@ import re
 import numpy as np
 import scipy.sparse as ssparse
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import normalize
 
 class Song:
     def __init__(self, name, track_uri) -> None:
@@ -134,15 +135,12 @@ def delete_rows_csr(mat, indices):
     return mat[mask]
 
 
-def swap_song_index_to_X(matrix, shape = None, reducer='linear'):
+def swap_song_index_to_X(matrix, shape = None, reducer='binary'):
     [playlist_index, X_index, value] = ssparse.find(matrix)
     swapped_matrix = ssparse.csr_matrix((X_index + 1, (playlist_index, value-1)), shape=shape)
     if reducer == 'linear':
         # Normalize before summing duplicates
-        recips = np.reciprocal(swapped_matrix.max(axis=1).toarray().astype(np.float32))
-        recips = ssparse.csr_matrix(recips)
-        swapped_matrix = recips.multiply(swapped_matrix).tocsr() * -1
-        swapped_matrix[swapped_matrix < -1] = -1
+        swapped_matrix = normalize(swapped_matrix, norm='max')
         swapped_matrix[swapped_matrix != 0] += 1
         swapped_matrix.sum_duplicates()
     elif reducer == 'binary':

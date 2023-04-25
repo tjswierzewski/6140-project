@@ -10,6 +10,7 @@ from functools import partial
 import pandas as pd
 import scipy
 from create_numpy_from_data import swap_song_index_to_X, data_to_query_label
+from time import perf_counter_ns
 
 ITEM_NEIGHBORS = 200
 USER_NEIGHBORS = 20
@@ -41,24 +42,36 @@ def remove_zeros(l):
 def get_song_based_recommendations(data, query_playlists):
     query_playlists = [[x-1 for x in y]for y in query_playlists]
     model = NearestNeighbors(n_neighbors = ITEM_NEIGHBORS, metric='cosine', n_jobs=-1)
+    fit_start = perf_counter_ns()
     model.fit(data)
+    fit_stop = perf_counter_ns()
     song_list = np.unique(query_playlists)
+    recommend_start = perf_counter_ns()
     recommendation_by_song = model.kneighbors(data[song_list],return_distance = False)
+    recommend_stop = perf_counter_ns()
+    reduce_start = perf_counter_ns()
     query_df =  pd.DataFrame(query_playlists).applymap(lambda x: recommendation_by_song[np.where(song_list == x)[0][0]])
-    return query_df.apply(rank_merge, axis = 1).tolist()
+    reduce_stop = perf_counter_ns()
+    return query_df.apply(rank_merge, axis = 1).tolist(), fit_stop - fit_start, recommend_stop - recommend_start, reduce_stop - reduce_start
     
         
 def get_playlist_recommendation_user_based(data, query_playlists):
     Train = swap_song_index_to_X(data)
     user_model = NearestNeighbors(n_neighbors = USER_NEIGHBORS, metric='cosine', n_jobs=-1)
+    fit_start = perf_counter_ns()
     user_model.fit(Train)
+    fit_stop = perf_counter_ns()
     query_playlists = ssparse.csr_matrix(query_playlists)
     query_playlists = swap_song_index_to_X(query_playlists, shape = (query_playlists.shape[0], Train.shape[1]))
 
     # Calculate nearest neighbors for playlist
+    recommend_start = perf_counter_ns()
     related_indices = user_model.kneighbors(query_playlists ,return_distance = False)
+    recommend_stop = perf_counter_ns()
+    reduce_start = perf_counter_ns()
     query_df = pd.DataFrame(related_indices).applymap(lambda x: np.trim_zeros(data[x].toarray()[0])-1)
-    return query_df.apply(rank_merge, axis = 1).tolist()
+    reduce_stop = perf_counter_ns()
+    return query_df.apply(rank_merge, axis = 1).tolist(), fit_stop - fit_start, recommend_stop - recommend_start, reduce_stop - reduce_start
 
 
 def main():
@@ -84,13 +97,13 @@ def main():
     query_playlists, query_answers = data_to_query_label(test)
 
     # Get recommendations for songs in queries
-    item_recommendations = get_song_based_recommendations(Train.T, query_playlists)
+    item_recommendations, fit_time, recommend_time, reduce_time = get_song_based_recommendations(Train.T, query_playlists)
     
     # Calculate item scores
     item_based_scores = list(map(lambda given, recommended: full_score(given, recommended), query_answers, item_recommendations))
     
     # Get recommendations based on users
-    user_recommendations = get_playlist_recommendation_user_based(train, query_playlists)
+    user_recommendations, fit_time, recommend_time, reduce_time = get_playlist_recommendation_user_based(train, query_playlists)
     
     # Calculate item scores
     user_based_scores = list(map(lambda given, recommended: full_score(given, recommended), query_answers, user_recommendations))
