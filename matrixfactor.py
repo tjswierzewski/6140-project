@@ -125,11 +125,11 @@ def getRecommendations(playlists, s_features, test_queries):
         # Calculate its feature vector.
         p_features = predictPlaylistFeatures(playlists[i], s_features)[0]
         # Generate a new playlist, sort by most likely song, and gather top + 10 recommendations.
-        recommendations = np.dot(p_features, s_features.transpose()).argsort()[::-1][:TOP_X + QUERY_LENGTH]
+        recommendations = np.dot(p_features, s_features.transpose()).argsort()[::-1][:TOP_X + len(test_queries[i])]
         # Remove any songs in original playlist.
         recommendations = removeDuplicates(recommendations, test_queries[i])
         # Truncate to 500 recommendations and store.
-        if len(recommendations) > TOP_X:
+        if len(recommendations) < TOP_X:
             recommendations = recommendations[:TOP_X]
         recommendation_list[i] = recommendations
     return recommendation_list
