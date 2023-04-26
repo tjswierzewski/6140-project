@@ -129,7 +129,9 @@ def getRecommendations(playlists, s_features, test_queries):
         # Remove any songs in original playlist.
         recommendations = removeDuplicates(recommendations, test_queries[i])
         # Truncate to 500 recommendations and store.
-        recommendation_list[i] = recommendations[:TOP_X]
+        if len(recommendations) > TOP_X:
+            recommendations = recommendations[:TOP_X]
+        recommendation_list[i] = recommendations
     return recommendation_list
 
 
